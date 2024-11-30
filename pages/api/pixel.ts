@@ -1,5 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { PrismaClient } from '@prisma/client'
+import path from 'path';
+import fs from 'fs';
 
 const prisma = new PrismaClient()
 
@@ -29,50 +31,64 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const referer = req.headers['referer']
     const metadata = JSON.stringify(req.query)
     
-    try {
-      // Fazer a requisição para o serviço de geolocalização
-      const geoResponse = await fetch(`http://ip-api.com/json/${clientIp}`)
-      // const geoData = await geoResponse.json()
-      // Processar a resposta e extrair as informações relevantes
-      const { city, region, country, lat, lon, isp, org } = await geoResponse.json()
+    const allCookies = req.cookies;
+    console.log(allCookies);
+    
+    // try {
+    // Fazer a requisição para o serviço de geolocalização
+    // const geoResponse = await fetch(`http://ip-api.com/json/${clientIp}`)
 
-      // Salvar no banco de dados
-      await prisma.pixelTrack.create({
-        data: {
-          ipAddress: clientIp,
-          userAgent: userAgent || 'Unknown',
-          referer: referer || null,
-          metadata: metadata,
-          city,
-          region,
-          country,
-          latitude: lat,
-          longitude: lon,
-          isp,
-          org
-        },
-      }).catch(e => {
-        console.error('Prisma error:', e)
-        throw e // Re-throw para ser capturado pelo catch externo
-      })
+    // Processar a resposta e extrair as informações relevantes
+    // const { city, region, country, lat, lon, isp, org } = await geoResponse.json()
 
-      // Criar um pixel transparente de 1x1
-      const pixelBuffer = Buffer.from(
-          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/wcAAwAB/BrNn5IAAAAASUVORK5CYII=',
-          // 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
-          'base64'
-      );
-      // Definir o cabeçalho e responder com a imagem do pixel
+    // Salvar no banco de dados
+    await prisma.pixelTrack.create({
+      data: {
+        ipAddress: clientIp,
+        userAgent: userAgent || 'Unknown',
+        referer: referer || null,
+        metadata: metadata,
+        cookies: JSON.stringify(allCookies),
+        // city,
+        // region,
+        // country,
+        // latitude: lat,
+        // longitude: lon,
+        // isp,
+        // org,
+      },
+    }).catch(e => {
+      console.error('Prisma error:', e)
+      throw e // Re-throw para ser capturado pelo catch externo
+    })
+
+    //   // Criar um pixel transparente de 1x1
+    //   const pixelBuffer = Buffer.from(
+    //       'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/wcAAwAB/BrNn5IAAAAASUVORK5CYII=',
+    //       // 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
+    //       'base64'
+    //   );
+    //   // Definir o cabeçalho e responder com a imagem do pixel
+    //   res.setHeader('Content-Type', 'image/png');
+    //   // res.setHeader('Content-Type', 'image/gif');
+    //   // res.setHeader('Content-Length', pixelBuffer.length);
+    //   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+    //   res.setHeader('Pragma', 'no-cache')
+    //   res.setHeader('Expires', '0')
+    //   res.status(200).send(pixelBuffer)
+    // } catch (error) {
+    //   console.error('Error tracking pixel:', error)
+    //   res.status(500).json({ error: 'Internal Server Error' })
+    // }
+    // Caminho para a imagem no diretório público
+    const filePath = path.join(process.cwd(), 'public', 'pixel.png');
+
+    // Certifique-se de que a imagem existe antes de enviar
+    if (fs.existsSync(filePath)) {
       res.setHeader('Content-Type', 'image/png');
-      // res.setHeader('Content-Type', 'image/gif');
-      // res.setHeader('Content-Length', pixelBuffer.length);
-      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
-      res.setHeader('Pragma', 'no-cache')
-      res.setHeader('Expires', '0')
-      res.status(200).send(pixelBuffer)
-    } catch (error) {
-      console.error('Error tracking pixel:', error)
-      res.status(500).json({ error: 'Internal Server Error' })
+      fs.createReadStream(filePath).pipe(res);
+    } else {
+      res.status(404).send('Pixel image not found');
     }
   } else {
     res.setHeader('Allow', ['GET'])

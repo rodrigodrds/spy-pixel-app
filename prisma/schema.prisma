@@ -26,5 +26,6 @@ model PixelTrack {
   longitude Float?
   isp       String?
   org       String?
+  cookies   String?
   timestamp DateTime @default(now())
 }
